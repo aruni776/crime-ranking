@@ -131,7 +131,7 @@ for article in all_articles:
         {
             "title": title,
             "source": article.get("source", {}).get("name", domain),
-            "published_on": (article.get("publishedAt") or "")[:10],
+            "published_at": (article.get("publishedAt") or "")[:10],
             "location": location,
             "crime_type": crime_type,
             "url": url,

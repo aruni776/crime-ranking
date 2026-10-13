@@ -98,7 +98,7 @@ def load_existing_articles():
             "id",
             "title",
             "source",
-            "published_on",
+            "published_at",
             "location",
             "crime_type",
             "url",
@@ -145,7 +145,7 @@ def collect_articles():
                 {
                     "title": title,
                     "source": source,
-                    "published_on": get_date(entry),
+                    "published_at": get_date(entry),
                     "location": location,
                     "crime_type": crime_type,
                     "url": url,
