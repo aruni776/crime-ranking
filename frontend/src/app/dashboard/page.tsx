@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import CrimeMapLoader from "./CrimeMapLoader";
 
 type Article = {
   id: string;
@@ -35,11 +36,43 @@ const summaryCards = [
   },
 ];
 
+const CHENNAI_AREAS = [
+  "All Areas",
+  "Adyar",
+  "Ambattur",
+  "Anna Nagar",
+  "Avadi",
+  "Besant Nagar",
+  "Chromepet",
+  "Chintadripet",
+  "Egmore",
+  "Guindy",
+  "Kodambakkam",
+  "Madhavaram",
+  "Medavakkam",
+  "Mylapore",
+  "Nanganallur",
+  "Nungambakkam",
+  "Pallavaram",
+  "Perambur",
+  "Porur",
+  "Royapettah",
+  "Saidapet",
+  "Sholinganallur",
+  "Tambaram",
+  "T. Nagar",
+  "Teynampet",
+  "Thiruvanmiyur",
+  "Triplicane",
+  "Velachery",
+];
+
 export default function DashboardPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
+  const [selectedArea, setSelectedArea] = useState("All Areas");
 
   useEffect(() => {
     async function fetchArticles() {
@@ -62,15 +95,24 @@ export default function DashboardPage() {
     fetchArticles();
   }, []);
   
-    const filteredArticles = articles.filter((article) => {
+    
+  const areaFilteredArticles = articles.filter((article) => {
+    if (selectedArea === "All Areas") return true;
+
+    return (
+      article.location.trim().toLowerCase() ===
+      selectedArea.toLowerCase()
+    );
+  });
+
+  const filteredArticles = areaFilteredArticles.filter((article) => {
     if (dateFilter === "all") return true;
 
     const publishedDate = new Date(article.published_on);
     if (Number.isNaN(publishedDate.getTime())) return false;
 
-    const now = new Date();
     const ageInDays =
-      (now.getTime() - publishedDate.getTime()) /
+      (Date.now() - publishedDate.getTime()) /
       (1000 * 60 * 60 * 24);
 
     if (dateFilter === "week") return ageInDays <= 7 && ageInDays >= 0;
@@ -78,8 +120,55 @@ export default function DashboardPage() {
     if (dateFilter === "month") return ageInDays <= 30 && ageInDays >= 0;
 
     return true;
-    });
-  const crimeReports = articles.length;
+  });
+
+  const crimeReports = areaFilteredArticles.length;
+
+  
+  const localityStats = Array.from(
+    new Set(
+      areaFilteredArticles
+        .map((article) => article.location.trim())
+        .filter(
+          (location) =>
+            location && location.toLowerCase() !== "chennai (general)",
+        ),
+    ),
+  ).map((location) => {
+    const localityArticles = areaFilteredArticles.filter(
+      (article) =>
+        article.location.trim().toLowerCase() ===
+        location.toLowerCase(),
+    );
+
+    const risk = localityArticles.reduce((total, article) => {
+      const publishedDate = new Date(article.published_on);
+      const daysOld = Number.isNaN(publishedDate.getTime())
+        ? 0
+        : Math.max(
+            0,
+            (Date.now() - publishedDate.getTime()) /
+              (1000 * 60 * 60 * 24),
+          );
+
+      const recencyFactor = Number.isNaN(publishedDate.getTime())
+        ? 0.5
+        : Math.exp(-daysOld / 180);
+
+      return total + 3 * recencyFactor;
+    }, 0);
+
+    return {
+      location,
+      reportCount: localityArticles.length,
+      score: Math.max(0, Math.round(100 - risk * 8)),
+    };
+  });
+
+  const highestConcern = [...localityStats].sort(
+    (a, b) => a.score - b.score,
+  )[0];
+
 
   const crimeTypes = [
     "Pickpocketing",
@@ -88,10 +177,10 @@ export default function DashboardPage() {
     "Assault",
     "Vandalism",
   ];
-
+  
   const crimeCounts = crimeTypes.map((crime) => ({
     name: crime,
-    count: articles.filter(
+    count: areaFilteredArticles.filter(
       (article) =>
         article.crime_type.toLowerCase() === crime.toLowerCase(),
     ).length,
@@ -145,10 +234,17 @@ export default function DashboardPage() {
               <p className="mt-7 text-4xl font-semibold">
                 {card.label === "CRIME REPORTS"
                   ? crimeReports
-                  : card.value}
+                  : card.label === "HIGHEST CONCERN"
+                    ? highestConcern?.location ?? "—"
+                    : card.value}
               </p>
 
-              <p className="mt-2 text-sm text-[#969dab]">{card.note}</p>
+              <p className="mt-2 text-sm text-[#969dab]">
+                {card.label === "HIGHEST CONCERN" && highestConcern
+                  ? `Safety score: ${highestConcern.score}/100 · ${highestConcern.reportCount} reviewed reports`
+                  : card.note}
+              </p>
+
             </article>
           ))}
         </div>
@@ -163,21 +259,38 @@ export default function DashboardPage() {
                 <h2 className="mt-2 text-xl font-medium">
                   Chennai locality map
                 </h2>
+                
+                <div className="mt-4">
+                  <label
+                    htmlFor="area-select"
+                    className="mb-2 block text-xs text-[#969dab]"
+                  >
+                    SELECT LOCALITY
+                  </label>
+
+                  <select
+                    id="area-select"
+                    value={selectedArea}
+                    onChange={(event) => setSelectedArea(event.target.value)}
+                    className="w-full rounded-lg border border-white/10 bg-[#0b101a] px-4 py-3 text-sm text-[#f2f0e9] outline-none focus:border-[#c9f36b]"
+                  >
+                    {CHENNAI_AREAS.map((area) => (
+                      <option key={area} value={area}>
+                        {area}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
               </div>
               <span className="text-xs text-[#969dab]">MAP MODULE</span>
             </div>
 
-            <div className="mt-6 flex min-h-64 items-center justify-center rounded-xl border border-dashed border-white/15 bg-[#0b101a] p-8 text-center">
-              <div>
-                <p className="text-3xl text-[#c9f36b]">⌖</p>
-                <p className="mt-3 text-sm text-[#f2f0e9]">
-                  Locality map will appear here
-                </p>
-                <p className="mt-2 text-xs leading-5 text-[#969dab]">
-                  We’ll connect Chennai localities and their calculated
-                  safety scores in the next stages.
-                </p>
-              </div>
+            <div className="mt-6 overflow-hidden rounded-xl">
+              <CrimeMapLoader
+                place={selectedArea === "All Areas" ? "Chennai" : selectedArea}
+                articles={areaFilteredArticles}
+              />
             </div>
           </section>
 
